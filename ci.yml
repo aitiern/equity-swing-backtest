@@ -1,4 +1,5 @@
-name: CI
+name: .github/workflows/ci.yml
+
 
 on:
   push:
