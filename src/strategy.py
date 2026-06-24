@@ -159,6 +159,32 @@ class BollingerReversion(Strategy):
                 self._invested[symbol] = False
 
 
+class MLSignalStrategy(Strategy):
+    """Executes pre-computed walk-forward ML signals. The model lives in src/ml/;
+    this class only translates a 0/1 position series per symbol into LONG/EXIT events.
+    It is intentionally NOT in the registry — it needs a fitted-signal dict, so it is
+    wired up by src/ml_backtest.py rather than selected by name."""
+
+    def __init__(self, data: DataHandler, events: deque, signals: dict):
+        super().__init__(data, events)
+        self.signals = signals
+        self._invested = dict.fromkeys(data.symbols, False)
+
+    def calculate_signals(self, event: MarketEvent) -> None:
+        for symbol in self.data.symbols:
+            ts = self._last_ts(symbol)
+            if ts is None:
+                continue
+            series = self.signals.get(symbol)
+            want_long = bool(series.get(ts, 0)) if series is not None else False
+            if want_long and not self._invested[symbol]:
+                self.events.append(SignalEvent(symbol, ts, "LONG"))
+                self._invested[symbol] = True
+            elif not want_long and self._invested[symbol]:
+                self.events.append(SignalEvent(symbol, ts, "EXIT"))
+                self._invested[symbol] = False
+
+
 # Registry: maps --strategy names to classes. Add new strategies here.
 STRATEGIES = {
     "ma_cross": MovingAverageCrossStrategy,

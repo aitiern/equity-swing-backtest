@@ -4,3 +4,4 @@ numpy>=1.24
 matplotlib>=3.7
 PyYAML>=6.0
 yfinance>=0.2
+scikit-learn>=1.3
