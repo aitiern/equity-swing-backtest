@@ -25,10 +25,23 @@ class WalkForwardResult:
     signals: dict[str, pd.Series]  # symbol -> 0/1 position per date (long when 1)
     first_prediction: pd.Timestamp | None
     n_predictions: int
-    accuracy: float  # directional accuracy over all OOS predictions
-    base_rate: float  # share of up-days (the naive "always long" hit rate)
+    accuracy: float  # classification accuracy over all OOS predictions
+    base_rate: float  # share of positive labels (up-days, or outperformers)
     folds: int
-    proba: dict[str, pd.Series] = field(default_factory=dict)  # symbol -> P(up)
+    proba: dict[str, pd.Series] = field(default_factory=dict)  # symbol -> P(positive)
+    targets: dict[str, pd.Series] = field(default_factory=dict)  # symbol -> realized label
+
+    @property
+    def majority_baseline(self) -> float:
+        """Accuracy of always predicting the majority class — the bar a classifier
+        must clear. (For a 40%-positive label that is 60%, not 40%.)"""
+        return max(self.base_rate, 1 - self.base_rate)
+
+    @property
+    def classification_edge(self) -> float:
+        """Accuracy minus the majority-class baseline, in percentage points. <= 0
+        means the model is no better than naively predicting the common class."""
+        return (self.accuracy - self.majority_baseline) * 100
 
 
 def _make_model(model_params: dict | None) -> HistGradientBoostingClassifier:
@@ -48,9 +61,22 @@ def walk_forward_signals(
     threshold: float = 0.5,
     lookback: int | None = None,  # None = expanding window; int = rolling window (days)
     model_params: dict | None = None,
+    horizon: int = 1,       # forward window for the label (1 = daily, 5 = weekly)
+    relative: bool = False,  # True = predict outperformance vs the sector, not direction
 ) -> WalkForwardResult:
     # Per-symbol features, then a pooled long-form table (date index + symbol column).
-    feats = {sym: build_features(df) for sym, df in frames.items()}
+    feats = {sym: build_features(df, horizon=horizon) for sym, df in frames.items()}
+
+    if relative:
+        # Cross-sectional target: did this name beat the sector's median forward return
+        # that day? Removes the market-direction component, isolating selection skill.
+        fwd = pd.DataFrame({sym: f["fwd_ret"] for sym, f in feats.items()})
+        median = fwd.median(axis=1)
+        for _sym, f in feats.items():
+            rel = (f["fwd_ret"] > median.reindex(f.index)).astype("float")
+            rel[f["fwd_ret"].isna()] = float("nan")
+            f["target"] = rel
+
     pooled = []
     for sym, f in feats.items():
         g = f.copy()
@@ -61,6 +87,7 @@ def walk_forward_signals(
     dates = np.array(sorted(pool.index.unique()))
     signals = {sym: pd.Series(0, index=feats[sym].index, dtype=int) for sym in frames}
     proba = {sym: pd.Series(np.nan, index=feats[sym].index, dtype=float) for sym in frames}
+    targets = {sym: pd.Series(np.nan, index=feats[sym].index, dtype=float) for sym in frames}
 
     correct = total = folds = 0
     first_prediction = None
@@ -88,6 +115,7 @@ def walk_forward_signals(
             for (ts, row), p in zip(block.iterrows(), p_up, strict=True):
                 sym = row["symbol"]
                 proba[sym].at[ts] = p
+                targets[sym].at[ts] = row["target"]
                 position = int(p > threshold)
                 signals[sym].at[ts] = position
                 if not np.isnan(row["target"]):  # score only where outcome is known
@@ -109,4 +137,5 @@ def walk_forward_signals(
         base_rate=base_rate,
         folds=folds,
         proba=proba,
+        targets=targets,
     )

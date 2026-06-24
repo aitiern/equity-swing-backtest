@@ -29,12 +29,16 @@ def _rsi(close: pd.Series, period: int = 14) -> pd.Series:
     return 100 - 100 / (1 + rs)
 
 
-def build_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Return a frame of FEATURE_COLS + ``target`` aligned to ``df``'s dates.
+def build_features(df: pd.DataFrame, horizon: int = 1) -> pd.DataFrame:
+    """Return a frame of FEATURE_COLS + ``target`` + ``fwd_ret`` aligned to ``df``.
 
     ``df`` must have lowercase open/high/low/close/volume columns and a DatetimeIndex.
-    Rows where any feature is undefined (early history) are dropped; the final row's
-    ``target`` is NaN (no next day) and is dropped only when training, not predicting.
+    ``horizon`` is the forward window for the label (1 = next-day direction, 5 = weekly).
+    A longer horizon gives a less noisy target at the cost of overlapping labels.
+
+    Rows where any feature is undefined (early history) are dropped; the final
+    ``horizon`` rows have NaN targets (no future yet) and are dropped only when
+    training, not when predicting.
     """
     close = df["close"]
     ret_1 = close.pct_change()
@@ -51,10 +55,12 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     out["dist_sma_200"] = close / close.rolling(200).mean() - 1
     out["vol_ratio"] = df["volume"] / df["volume"].rolling(21).mean()
 
-    # Target: 1 if the NEXT day closes higher than today. Forward-looking by design;
-    # used only as the label. shift(-1) means the last row's target is NaN.
-    out["target"] = (close.shift(-1) > close).astype("float")
-    out.loc[close.shift(-1).isna(), "target"] = float("nan")
+    # Forward return over `horizon` days. Forward-looking by design; used only to
+    # build the label, never as a model input.
+    fwd_ret = close.shift(-horizon) / close - 1
+    out["fwd_ret"] = fwd_ret
+    out["target"] = (fwd_ret > 0).astype("float")
+    out.loc[fwd_ret.isna(), "target"] = float("nan")
 
-    # Drop rows with any undefined feature (keeps target NaN on the last row intact).
+    # Drop rows with any undefined feature (keeps target NaN on the final rows intact).
     return out.dropna(subset=FEATURE_COLS)

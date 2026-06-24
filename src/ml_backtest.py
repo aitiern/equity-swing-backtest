@@ -65,10 +65,10 @@ def main(argv=None) -> int:
     print("--- Walk-forward model diagnostics ---")
     print(f"folds (retrains): {wf.folds}")
     print(f"OOS predictions:  {wf.n_predictions}")
-    print(f"directional accuracy: {wf.accuracy * 100:.2f}%  (base rate / always-long: "
-          f"{wf.base_rate * 100:.2f}%)")
-    edge = (wf.accuracy - wf.base_rate) * 100
-    print(f"edge over base rate:  {edge:+.2f} pts  "
+    print(f"directional accuracy: {wf.accuracy * 100:.2f}%  (majority-class baseline: "
+          f"{wf.majority_baseline * 100:.2f}%)")
+    edge = wf.classification_edge
+    print(f"edge over baseline:  {edge:+.2f} pts  "
           f"{'(model adds signal)' if edge > 0 else '(NO edge — model is not beating naive)'}")
     if wf.first_prediction is None:
         print("\nNo predictions produced — need more history (lower --min-train).")
