@@ -1,0 +1,44 @@
+name: paper-trade
+
+# Scheduled paper trader. Runs after the US close on weekdays, computes signals,
+# submits PAPER orders, and commits the equity log the dashboard reads.
+# Requires repo secrets: ALPACA_API_KEY, ALPACA_SECRET_KEY (paper keys).
+
+on:
+  schedule:
+    - cron: "30 21 * * 1-5"   # 21:30 UTC, Mon-Fri (after the US cash close)
+  workflow_dispatch: {}        # allow manual runs from the Actions tab
+
+permissions:
+  contents: write              # to commit the updated equity log
+
+jobs:
+  trade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run paper trader
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_PAPER: "true"
+          TRADE_SECTOR: tech
+          TRADE_STRATEGY: donchian
+        run: python -m src.live.trade
+
+      - name: Commit equity log
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add tracking/equity_log.csv
+          git commit -m "chore: log paper equity [skip ci]" || echo "no change to commit"
+          git push
