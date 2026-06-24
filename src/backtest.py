@@ -25,7 +25,7 @@ from .execution import SimulatedExecutionHandler
 from .metrics import format_summary, summary
 from .plotting import save_equity_curve
 from .portfolio import Portfolio
-from .strategy import MovingAverageCrossStrategy
+from .strategy import STRATEGIES, MovingAverageCrossStrategy
 
 
 def build_argparser() -> argparse.ArgumentParser:
@@ -36,6 +36,10 @@ def build_argparser() -> argparse.ArgumentParser:
     p.add_argument("--yf", nargs="*", default=None, help="ticker(s) to download from Yahoo Finance")
     p.add_argument("--start", default="2015-01-01", help="start date for --yf download")
     p.add_argument("--end", default=None, help="end date for --yf download (default: today)")
+    p.add_argument(
+        "--strategy", default="ma_cross", choices=list(STRATEGIES),
+        help="which strategy to run (default: ma_cross)",
+    )
     p.add_argument("--capital", type=float, default=100_000.0)
     p.add_argument("--slippage-bps", type=float, default=5.0)
     p.add_argument("--commission-bps", type=float, default=1.0)
@@ -84,7 +88,10 @@ def main(argv=None) -> int:
         print("No data source given; running on synthetic DEMO data.")
         data = DataHandler.demo(events)
 
-    strategy = MovingAverageCrossStrategy(data, events, short=args.short, long=args.long)
+    if args.strategy == "ma_cross":
+        strategy = MovingAverageCrossStrategy(data, events, short=args.short, long=args.long)
+    else:
+        strategy = STRATEGIES[args.strategy](data, events)
     portfolio = Portfolio(data, events, initial_capital=args.capital)
     execution = SimulatedExecutionHandler(
         data, events, slippage_bps=args.slippage_bps, commission_bps=args.commission_bps

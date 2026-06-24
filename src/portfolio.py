@@ -93,9 +93,11 @@ class Portfolio:
         return None
 
     def _size_order(self, price: float, strength: float) -> int:
-        """Fixed-fractional sizing against current total equity."""
+        """Fixed-fractional sizing against current total equity, equal-weighted across
+        the universe so a basket of N symbols can't each claim the whole book."""
         equity = self.equity_curve[-1][1] if self.equity_curve else self.initial_capital
-        budget = equity * self.target_pct * max(0.0, min(1.0, strength))
+        n = max(1, len(self.data.symbols))
+        budget = equity * (self.target_pct / n) * max(0.0, min(1.0, strength))
         return int(budget // price)
 
     # ----- fill -> position/cash ------------------------------------------------
