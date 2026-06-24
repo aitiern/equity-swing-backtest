@@ -7,6 +7,9 @@ requires-python = ">=3.11"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+# Put the repo root on sys.path so `import src...` works under plain `pytest`
+# (not just `python -m pytest`) — this is what CI invokes.
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 110
