@@ -1,7 +1,6 @@
 # [Strategy Name] — [one-line description, e.g. "Mean-reversion strategy on US large-cap equities"]
 
-<!-- Update OWNER/REPO once pushed so the CI badge resolves. -->
-[![CI](https://github.com/aitiern/[REPO]/actions/workflows/ci.yml/badge.svg)](https://github.com/aitiern/[REPO]/actions/workflows/ci.yml)
+[![CI](https://github.com/aitiern/equity-swing-backtest/actions/workflows/ci.yml/badge.svg)](https://github.com/aitiern/equity-swing-backtest/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 > **Headline result:** Backtested [START]–[END] on [universe]: Sharpe **[x.xx]**, max drawdown **[xx]%**,
