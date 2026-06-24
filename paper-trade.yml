@@ -1,4 +1,4 @@
-name: paper-trade
+name: .github/workflows/paper-trade.yml
 
 # Scheduled paper trader. Runs after the US close on weekdays, computes signals,
 # submits PAPER orders, and commits the equity log the dashboard reads.
