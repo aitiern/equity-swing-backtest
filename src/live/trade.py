@@ -69,10 +69,24 @@ def _log_equity(snapshot: dict, holdings) -> None:
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="Alpaca paper auto-trader")
     p.add_argument("--dry-run", action="store_true", help="print intended orders, submit nothing")
+    p.add_argument("--check", action="store_true", help="read-only: verify keys + show account, no orders")
     p.add_argument("--sector", default=os.getenv("TRADE_SECTOR", "tech"))
     p.add_argument("--strategy", default=os.getenv("TRADE_STRATEGY", "donchian"))
     p.add_argument("--capital", type=float, default=100_000.0, help="hypothetical equity for --dry-run")
     args = p.parse_args(argv)
+
+    if args.check:
+        from .broker import AlpacaBroker
+
+        broker = AlpacaBroker()
+        snap = broker.account_snapshot()
+        print(f"CONNECTED to Alpaca paper. Equity ${snap['equity']:,.2f} | "
+              f"Cash ${snap['cash']:,.2f} | Buying power ${snap['buying_power']:,.2f}")
+        positions = broker.position_details()
+        print(f"Open positions: {len(positions)}")
+        for pos in positions:
+            print(f"  {pos['symbol']:5} {pos['qty']:>5} sh  P/L ${pos['unrealized_pl']:,.2f}")
+        return 0
 
     symbols = resolve(args.sector)
     print(f"Universe: {args.sector} ({', '.join(symbols)}) | strategy: {args.strategy}")
