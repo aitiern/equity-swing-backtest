@@ -37,6 +37,21 @@ def load_progression() -> pd.DataFrame:
     return df.sort_values("timestamp")
 
 
+@st.cache_data(ttl=900)
+def load_spy(start_iso: str, end_iso: str):
+    """SPY closes over the tracked window (cached). Returns None on any failure."""
+    from collections import deque
+
+    from src.data import DataHandler
+
+    try:
+        dh = DataHandler.from_yfinance(["SPY"], start_iso, end_iso, deque(), cache_dir=None)
+        spy = dh.close_frame()["SPY"]
+        return spy if not spy.empty else None
+    except Exception:
+        return None
+
+
 def get_broker():
     from src.live.broker import AlpacaBroker
 
@@ -60,14 +75,38 @@ except Exception as exc:  # no keys yet, or alpaca-py missing
         f"\n\n_Details: {exc}_"
     )
 
-# --- equity progression -----------------------------------------------------------
-st.subheader("Equity progression")
+# --- equity progression vs SPY ----------------------------------------------------
+st.subheader("Equity progression vs SPY")
 prog = load_progression()
 if not prog.empty:
-    st.line_chart(prog.set_index("timestamp")["equity"])
+    from src.live.dashboard_utils import (
+        BENCHMARK_LABEL,
+        STRATEGY_LABEL,
+        combine_equity_and_benchmark,
+        normalize_benchmark,
+    )
+
+    start_equity = float(prog["equity"].iloc[0])
+    start_iso = pd.to_datetime(prog["timestamp"].min(), utc=True).date().isoformat()
+    end_iso = (pd.to_datetime(prog["timestamp"].max(), utc=True) + pd.Timedelta(days=1)).date().isoformat()
+
+    spy = load_spy(start_iso, end_iso)
+    bench = normalize_benchmark(spy, start_equity) if spy is not None else None
+    combined = combine_equity_and_benchmark(prog, bench)
+    st.line_chart(combined)
+
+    # Contextual caption: who's ahead since inception?
+    if BENCHMARK_LABEL in combined.columns:
+        s_ret = combined[STRATEGY_LABEL].dropna().iloc[-1] / start_equity - 1
+        b_ret = combined[BENCHMARK_LABEL].dropna().iloc[-1] / start_equity - 1
+        verdict = "ahead of" if s_ret > b_ret else "behind"
+        st.caption(f"Since inception: strategy **{s_ret * 100:+.1f}%** vs SPY **{b_ret * 100:+.1f}%** "
+                   f"— currently **{verdict}** buy-and-hold.")
+    else:
+        st.caption("SPY benchmark unavailable right now; showing strategy equity only.")
 else:
     st.write("No history logged yet — the scheduled trader appends to "
-             f"`{LOG_PATH}` each run.")
+             f"`{LOG_PATH}` each run, and the SPY line will appear alongside it.")
 
 # --- positions --------------------------------------------------------------------
 if broker is not None:
