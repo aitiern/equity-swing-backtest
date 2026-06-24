@@ -68,6 +68,41 @@ class DataHandler:
         return cls(frames, events)
 
     @classmethod
+    def from_yfinance(
+        cls,
+        symbols: list[str],
+        start: str,
+        end: str | None,
+        events: deque,
+        interval: str = "1d",
+        cache_dir: str | None = "data",
+    ) -> DataHandler:
+        """Download real OHLCV bars from Yahoo Finance (auto-adjusted for splits/divs).
+
+        If ``cache_dir`` is set, each symbol is saved as ``<cache_dir>/<symbol>.csv`` so
+        re-runs are reproducible and offline-friendly — and so a result can be tied to
+        the exact data it came from."""
+        import yfinance as yf
+
+        frames = {}
+        for sym in symbols:
+            raw = yf.download(
+                sym, start=start, end=end, interval=interval,
+                auto_adjust=True, progress=False,
+            )
+            if raw.empty:
+                raise ValueError(f"yfinance returned no data for {sym} ({start}..{end})")
+            if isinstance(raw.columns, pd.MultiIndex):
+                raw.columns = raw.columns.get_level_values(0)  # flatten (Price, Ticker)
+            raw = raw.rename(columns=str.lower)[["open", "high", "low", "close", "volume"]]
+            raw.index.name = "date"
+            frames[sym] = raw
+            if cache_dir:
+                os.makedirs(cache_dir, exist_ok=True)
+                raw.to_csv(os.path.join(cache_dir, f"{sym}.csv"))
+        return cls(frames, events)
+
+    @classmethod
     def demo(cls, events: deque, symbol: str = "DEMO", n: int = 750, seed: int = 7) -> DataHandler:
         """Deterministic synthetic random-walk series. DEMO DATA ONLY — never present
         results computed on this as real strategy performance."""

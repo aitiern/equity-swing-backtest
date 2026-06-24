@@ -33,6 +33,9 @@ def build_argparser() -> argparse.ArgumentParser:
     p.add_argument("--config", default=None, help="YAML file of defaults (CLI flags override it)")
     p.add_argument("--csv-dir", default=None, help="directory of <SYMBOL>.csv OHLCV files")
     p.add_argument("--symbols", nargs="*", default=None, help="symbols to load from --csv-dir")
+    p.add_argument("--yf", nargs="*", default=None, help="ticker(s) to download from Yahoo Finance")
+    p.add_argument("--start", default="2015-01-01", help="start date for --yf download")
+    p.add_argument("--end", default=None, help="end date for --yf download (default: today)")
     p.add_argument("--capital", type=float, default=100_000.0)
     p.add_argument("--slippage-bps", type=float, default=5.0)
     p.add_argument("--commission-bps", type=float, default=1.0)
@@ -72,10 +75,13 @@ def main(argv=None) -> int:
     args = _apply_config(parser, argv)
     events: deque = deque()
 
-    if args.csv_dir and args.symbols:
+    if args.yf:
+        print(f"Downloading {args.yf} from Yahoo Finance ({args.start}..{args.end or 'today'})...")
+        data = DataHandler.from_yfinance(args.yf, args.start, args.end, events)
+    elif args.csv_dir and args.symbols:
         data = DataHandler.from_csv_dir(args.csv_dir, args.symbols, events)
     else:
-        print("No --csv-dir/--symbols given; running on synthetic DEMO data.")
+        print("No data source given; running on synthetic DEMO data.")
         data = DataHandler.demo(events)
 
     strategy = MovingAverageCrossStrategy(data, events, short=args.short, long=args.long)
