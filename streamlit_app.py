@@ -126,9 +126,11 @@ sector = os.getenv("TRADE_SECTOR", "tech")
 strategy = os.getenv("TRADE_STRATEGY", "donchian")
 st.caption(f"Universe: **{sector}**  ·  strategy: **{strategy}**")
 if st.button("Compute current signals"):
-    from src.live.signals import desired_holdings
+    from src.live.signals import desired_holdings, fetch_frames
     from src.universe import resolve
 
     with st.spinner("Fetching data and running the strategy..."):
-        holdings, _ = desired_holdings(resolve(sector), strategy)
+        symbols = resolve(sector)
+        frames = fetch_frames(symbols)
+        holdings, _ = desired_holdings(symbols, strategy, frames)
     st.success(f"Long: {sorted(holdings) or '(nothing)'}")

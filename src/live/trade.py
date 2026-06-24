@@ -16,7 +16,7 @@ import os
 import pandas as pd
 
 from ..universe import resolve
-from .signals import desired_holdings
+from .signals import desired_holdings, fetch_frames
 
 LOG_PATH = "tracking/equity_log.csv"
 LOG_FIELDS = ["timestamp", "equity", "cash", "n_positions", "holdings"]
@@ -90,7 +90,8 @@ def main(argv=None) -> int:
 
     symbols = resolve(args.sector)
     print(f"Universe: {args.sector} ({', '.join(symbols)}) | strategy: {args.strategy}")
-    holdings, prices = desired_holdings(symbols, args.strategy)
+    frames = fetch_frames(symbols)
+    holdings, prices = desired_holdings(symbols, args.strategy, frames)
     print(f"Strategy wants to be LONG: {sorted(holdings) or '(nothing)'}")
 
     if args.dry_run:
@@ -98,10 +99,11 @@ def main(argv=None) -> int:
         orders = reconcile(targets, current={})  # assume flat
         print(f"\n[DRY RUN] hypothetical equity ${args.capital:,.0f} — intended orders:")
         for sym, qty, side in orders:
-            print(f"  {side:4} {qty:>5} {sym} @ ~${prices[sym]:.2f}")
+            price = prices.get(sym) or 0.0
+            print(f"  {side:4} {qty:>5} {sym} @ ~${price:.2f}")
         if not orders:
             print("  (none)")
-        print("\nNo keys used, nothing submitted. Remove --dry-run to trade on paper.")
+        print("\nNothing submitted. Remove --dry-run to trade on paper.")
         return 0
 
     # ---- live paper path ----
