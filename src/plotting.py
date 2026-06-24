@@ -13,6 +13,7 @@ def save_equity_curve(
     path: str = "docs/equity-curve.png",
     benchmark: pd.Series | None = None,
     title: str = "Strategy equity curve",
+    oos_start: pd.Timestamp | None = None,
 ) -> str:
     import matplotlib
 
@@ -29,6 +30,10 @@ def save_equity_curve(
     if benchmark is not None and not benchmark.empty:
         scaled = benchmark / benchmark.iloc[0] * equity.iloc[0]
         ax_eq.plot(scaled.index, scaled.values, label="Benchmark", linewidth=1.0, alpha=0.7)
+    if oos_start is not None:
+        # Shade the held-out period so the in-sample/out-of-sample boundary is obvious.
+        ax_eq.axvline(oos_start, color="gray", linestyle="--", linewidth=1.0)
+        ax_eq.axvspan(oos_start, equity.index[-1], color="gray", alpha=0.07, label="Out-of-sample")
     ax_eq.set_title(title)
     ax_eq.set_ylabel("Equity")
     ax_eq.legend(loc="upper left")

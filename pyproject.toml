@@ -1,0 +1,21 @@
+[project]
+name = "trading-strategy-backtest"
+version = "0.1.0"
+description = "Event-driven backtest engine with market-risk metrics (VaR/CVaR)"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, isort, bugbear, pyupgrade, comprehensions.
+select = ["E", "F", "I", "B", "UP", "C4"]
+ignore = ["E501"]  # line length handled by the formatter, not the linter
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]

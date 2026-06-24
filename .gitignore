@@ -5,6 +5,9 @@ __pycache__/
 venv/
 .env
 .DS_Store
+# Run outputs (the blotter etc.) are reproducible — don't commit them:
+results/
+
 # Keep raw data out of git unless it's small and you have the right to publish it:
 data/*.csv
 !data/.gitkeep

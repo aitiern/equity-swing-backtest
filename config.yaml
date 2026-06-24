@@ -1,0 +1,21 @@
+# Backtest configuration. Run:  python -m src.backtest --config config.yaml
+# Every key maps to a CLI flag; anything you pass on the command line overrides this.
+# Commit the config you used for a result so the run is reproducible.
+
+capital: 100000
+slippage_bps: 5.0          # adverse fill, basis points (5 = 0.05%)
+commission_bps: 1.0        # cost per trade, basis points of notional
+
+# Demo strategy params (replace when you wire in your real strategy):
+short: 20
+long: 50
+
+# Real data (leave commented to use built-in synthetic demo data):
+# csv_dir: data
+# symbols: [AAPL, MSFT]
+
+# Out-of-sample split: stats before/after this date are reported separately.
+# oos_start: "2023-01-01"
+
+plot: docs/equity-curve.png
+blotter: results/trades.csv

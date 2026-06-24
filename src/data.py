@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import os
 from collections import deque
-from typing import Deque, Dict, List, Optional
 
 import pandas as pd
 
@@ -27,20 +26,20 @@ class DataHandler:
     run with no external data so a reviewer can clone and execute immediately.
     """
 
-    def __init__(self, frames: Dict[str, pd.DataFrame], events: Deque):
+    def __init__(self, frames: dict[str, pd.DataFrame], events: deque):
         self.events = events
         self.symbols = list(frames)
         self._frames = {s: self._validate(df, s) for s, df in frames.items()}
 
         # Master timeline = union of all symbol indexes, sorted.
         index = sorted(set().union(*[df.index for df in self._frames.values()]))
-        self._timeline: List[pd.Timestamp] = index
+        self._timeline: list[pd.Timestamp] = index
         self._cursor = -1
 
         # Trailing window of bars actually "seen" so far, per symbol.
-        self._seen: Dict[str, Deque] = {s: deque(maxlen=2048) for s in self.symbols}
+        self._seen: dict[str, deque] = {s: deque(maxlen=2048) for s in self.symbols}
         self.continue_backtest = True
-        self.current_time: Optional[pd.Timestamp] = None
+        self.current_time: pd.Timestamp | None = None
 
     # ----- construction helpers -------------------------------------------------
     @staticmethod
@@ -55,11 +54,11 @@ class DataHandler:
         return df.sort_index()
 
     @classmethod
-    def from_frames(cls, frames: Dict[str, pd.DataFrame], events: Deque) -> "DataHandler":
+    def from_frames(cls, frames: dict[str, pd.DataFrame], events: deque) -> DataHandler:
         return cls(frames, events)
 
     @classmethod
-    def from_csv_dir(cls, directory: str, symbols: List[str], events: Deque) -> "DataHandler":
+    def from_csv_dir(cls, directory: str, symbols: list[str], events: deque) -> DataHandler:
         """Load ``<directory>/<symbol>.csv`` files with a parseable date column."""
         frames = {}
         for sym in symbols:
@@ -69,7 +68,7 @@ class DataHandler:
         return cls(frames, events)
 
     @classmethod
-    def demo(cls, events: Deque, symbol: str = "DEMO", n: int = 750, seed: int = 7) -> "DataHandler":
+    def demo(cls, events: deque, symbol: str = "DEMO", n: int = 750, seed: int = 7) -> DataHandler:
         """Deterministic synthetic random-walk series. DEMO DATA ONLY — never present
         results computed on this as real strategy performance."""
         import numpy as np
@@ -104,13 +103,35 @@ class DataHandler:
                 self._seen[sym].append((ts, bar))
         self.events.append(MarketEvent())
 
-    def get_latest_bars(self, symbol: str, n: int = 1) -> List:
+    def get_latest_bars(self, symbol: str, n: int = 1) -> list:
         """Return up to the last ``n`` (timestamp, bar) pairs seen for ``symbol``."""
         window = self._seen.get(symbol)
         if not window:
             return []
         return list(window)[-n:]
 
-    def latest_close(self, symbol: str) -> Optional[float]:
+    def latest_close(self, symbol: str) -> float | None:
         bars = self.get_latest_bars(symbol, 1)
         return float(bars[-1][1]["close"]) if bars else None
+
+    # ----- reference data (whole-series; benchmark/reporting only) --------------
+    def close_frame(self) -> pd.DataFrame:
+        """Full close prices for every symbol, aligned on the master timeline.
+
+        Uses the entire series — fine for a buy-and-hold benchmark, which is a
+        reference, not a tradeable signal. Never call this from a Strategy: doing so
+        would leak future prices and reintroduce the lookahead bias the streaming
+        API exists to prevent."""
+        return pd.DataFrame(
+            {s: df["close"] for s, df in self._frames.items()},
+            index=pd.DatetimeIndex(self._timeline),
+        ).ffill()
+
+    def benchmark_equity(self, initial_capital: float) -> pd.Series:
+        """Equal-weight buy-and-hold of all symbols, normalised to start at capital."""
+        closes = self.close_frame()
+        if closes.empty:
+            return pd.Series(dtype=float)
+        norm = closes.div(closes.iloc[0])  # each symbol -> growth multiple from t0
+        portfolio = norm.mean(axis=1)  # equal weight
+        return portfolio * initial_capital

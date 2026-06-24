@@ -11,7 +11,7 @@ Swap ``_size_order`` for vol-targeting or fixed-risk sizing when you are ready.
 
 from __future__ import annotations
 
-from typing import Deque, Dict, List, Tuple
+from collections import deque
 
 import pandas as pd
 
@@ -23,7 +23,7 @@ class Portfolio:
     def __init__(
         self,
         data: DataHandler,
-        events: Deque,
+        events: deque,
         initial_capital: float = 100_000.0,
         target_pct: float = 0.95,
         allow_short: bool = False,
@@ -35,11 +35,12 @@ class Portfolio:
         self.allow_short = allow_short
 
         self.cash = float(initial_capital)
-        self.positions: Dict[str, int] = {s: 0 for s in data.symbols}
-        self.avg_price: Dict[str, float] = {s: 0.0 for s in data.symbols}
+        self.positions: dict[str, int] = dict.fromkeys(data.symbols, 0)
+        self.avg_price: dict[str, float] = dict.fromkeys(data.symbols, 0.0)
 
-        self.equity_curve: List[Tuple[pd.Timestamp, float]] = []
-        self.closed_trades: List[float] = []  # realised PnL per closed/reduced lot
+        self.equity_curve: list[tuple[pd.Timestamp, float]] = []
+        self.closed_trades: list[float] = []  # realised PnL per closed/reduced lot
+        self.fills: list[dict] = []  # blotter: every fill, for an auditable trade log
 
     # ----- mark to market -------------------------------------------------------
     def update_timeindex(self, _event) -> None:
@@ -127,9 +128,26 @@ class Portfolio:
         self.positions[sym] = new_qty
         self.cash -= fill.fill_price * signed + fill.commission
 
+        self.fills.append(
+            {
+                "timestamp": fill.timestamp,
+                "symbol": sym,
+                "direction": fill.direction,
+                "quantity": fill.quantity,
+                "fill_price": fill.fill_price,
+                "commission": fill.commission,
+                "cash_after": self.cash,
+                "position_after": new_qty,
+            }
+        )
+
     # ----- output ---------------------------------------------------------------
     def equity_series(self) -> pd.Series:
         if not self.equity_curve:
             return pd.Series(dtype=float)
-        ts, vals = zip(*self.equity_curve)
+        ts, vals = zip(*self.equity_curve, strict=True)
         return pd.Series(vals, index=pd.DatetimeIndex(ts), name="equity")
+
+    def blotter(self) -> pd.DataFrame:
+        """Auditable trade log — every fill with running cash and position."""
+        return pd.DataFrame(self.fills)

@@ -9,14 +9,14 @@ separation keeps the alpha logic honest and independently testable.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Deque
+from collections import deque
 
 from .data import DataHandler
 from .events import MarketEvent, SignalEvent
 
 
 class Strategy(ABC):
-    def __init__(self, data: DataHandler, events: Deque):
+    def __init__(self, data: DataHandler, events: deque):
         self.data = data
         self.events = events
 
@@ -36,13 +36,13 @@ class MovingAverageCrossStrategy(Strategy):
     the actual logic you trade, then delete this warning.
     ========================================================================="""
 
-    def __init__(self, data: DataHandler, events: Deque, short: int = 20, long: int = 50):
+    def __init__(self, data: DataHandler, events: deque, short: int = 20, long: int = 50):
         super().__init__(data, events)
         if short >= long:
             raise ValueError("short window must be smaller than long window")
         self.short = short
         self.long = long
-        self._invested = {s: False for s in data.symbols}
+        self._invested = dict.fromkeys(data.symbols, False)
 
     def calculate_signals(self, event: MarketEvent) -> None:
         for symbol in self.data.symbols:

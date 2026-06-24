@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 
 from src import metrics
-from src.portfolio import Portfolio
 from src.events import FillEvent
+from src.portfolio import Portfolio
 
 
 def _series(values):
@@ -40,6 +40,37 @@ def test_cagr_doubling_in_one_year():
 def test_win_rate():
     assert metrics.win_rate([10, -5, 20, -1]) == 0.5
     assert metrics.win_rate([]) == 0.0
+
+
+def test_historical_var_is_positive_loss():
+    # Returns from -5% to +4%; 95% VaR should sit near the worst observations.
+    rets = pd.Series([-0.05, -0.03, -0.01, 0.0, 0.01, 0.02, 0.03, 0.04])
+    var = metrics.historical_var(rets, level=0.95)
+    assert var > 0  # reported as a positive loss magnitude
+    assert var <= 0.05  # cannot exceed the worst loss
+
+
+def test_cvar_at_least_var():
+    # Expected shortfall (tail mean) is always >= VaR (tail threshold).
+    rets = pd.Series([-0.08, -0.05, -0.04, -0.02, 0.0, 0.01, 0.02, 0.03, 0.04, 0.05])
+    var = metrics.historical_var(rets, level=0.90)
+    cvar = metrics.conditional_var(rets, level=0.90)
+    assert cvar >= var
+
+
+def test_parametric_var_matches_normal_quantile():
+    # For a symmetric series with mean 0, parametric 95% VaR ≈ 1.645 * sigma.
+    rng = np.random.default_rng(0)
+    rets = pd.Series(rng.normal(0, 0.01, 10_000))
+    var = metrics.parametric_var(rets, level=0.95)
+    assert abs(var - 1.645 * rets.std(ddof=1)) < 0.001
+
+
+def test_summary_includes_risk_metrics():
+    eq = _series([100, 102, 99, 101, 105, 103])
+    stats = metrics.summary(eq, [5.0, -2.0])
+    for key in ("hist_var_95", "cvar_95", "hist_var_99", "cvar_99"):
+        assert key in stats
 
 
 def test_round_trip_pnl_accounting():

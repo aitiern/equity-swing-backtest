@@ -1,5 +1,9 @@
 # [Strategy Name] — [one-line description, e.g. "Mean-reversion strategy on US large-cap equities"]
 
+<!-- Update OWNER/REPO once pushed so the CI badge resolves. -->
+[![CI](https://github.com/aitiern/[REPO]/actions/workflows/ci.yml/badge.svg)](https://github.com/aitiern/[REPO]/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 > **Headline result:** Backtested [START]–[END] on [universe]: Sharpe **[x.xx]**, max drawdown **[xx]%**,
 > [n] trades. Benchmark: [e.g. SPY buy-and-hold, Sharpe x.xx].
 >
@@ -24,16 +28,24 @@ reader who spends 30 seconds before deciding whether to read on.
 - [Any cleaning / survivorship-bias / corporate-action handling worth mentioning.]
 
 ## Backtest methodology
-- Costs & slippage: [assumptions — be explicit; this is what separates serious work from toy backtests]
-- Position sizing / risk controls: [e.g. fixed fractional, vol targeting, max position]
-- Out-of-sample / walk-forward: [how you guarded against overfitting]
+- **Costs & slippage:** modelled explicitly (`--slippage-bps`, `--commission-bps`); slippage always
+  works against the fill. [State your assumptions and why.]
+- **Position sizing / risk controls:** fixed-fractional sizing against current equity (`Portfolio`).
+  [Swap for vol-targeting / fixed-risk if you use it.]
+- **Out-of-sample:** pass `--oos-start YYYY-MM-DD` to report held-out performance separately from the
+  fitting period — the overfitting guard. [Say which dates you held out.]
+- **Market risk:** historical & parametric VaR plus CVaR (expected shortfall) at 95% / 99% are reported
+  every run. [Comment on tail behaviour.]
 
 ## Results
+<!-- Fill from a real run: `python -m src.backtest --config config.yaml`. -->
 | Metric | Strategy | Benchmark |
 |---|---|---|
 | CAGR | [ ] | [ ] |
 | Sharpe | [ ] | [ ] |
 | Max drawdown | [ ] | [ ] |
+| 95% VaR (daily) | [ ] | [ ] |
+| 95% CVaR (daily) | [ ] | [ ] |
 | Win rate | [ ] | — |
 
 ## Limitations & next steps
@@ -42,9 +54,28 @@ weaknesses reads as maturity — especially to a risk audience.
 
 ## How to run
 ```bash
-pip install -r requirements.txt
-python -m src.backtest
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements-dev.txt                 # runtime + test/lint tooling
+
+python -m src.backtest                               # built-in synthetic demo data
+python -m src.backtest --config config.yaml          # reproducible run from a config file
+python -m src.backtest --csv-dir data --symbols AAPL --oos-start 2023-01-01
+
+pytest          # run the test suite
+ruff check .    # lint
 ```
 
+Outputs: a performance summary (full / benchmark / in-sample / out-of-sample), an equity-curve chart
+at `docs/equity-curve.png`, and an auditable trade blotter at `results/trades.csv`.
+
+## Project layout
+```
+src/        events · data · strategy · portfolio · execution · engine · metrics · plotting · backtest
+tests/      metric math, cash-conservation accounting, end-to-end + lookahead-bias guard
+config.yaml reproducible run configuration
+```
+Replace the placeholder strategy in `src/strategy.py` with your real signal — that is the only file
+you must edit. Everything else (accounting, costs, metrics, charting) is reusable.
+
 ## Tech
-Python · pandas · NumPy · matplotlib · [add what you actually use]
+Python · pandas · NumPy · matplotlib · pytest · ruff

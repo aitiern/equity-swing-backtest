@@ -7,7 +7,7 @@ from a toy one — so these are first-class, configurable inputs, not afterthoug
 
 from __future__ import annotations
 
-from typing import Deque
+from collections import deque
 
 from .data import DataHandler
 from .events import FillEvent, OrderEvent
@@ -17,7 +17,7 @@ class SimulatedExecutionHandler:
     def __init__(
         self,
         data: DataHandler,
-        events: Deque,
+        events: deque,
         slippage_bps: float = 5.0,
         commission_bps: float = 1.0,
         min_commission: float = 1.0,
